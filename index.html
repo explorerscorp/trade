@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <title>Registro de Criptomonedas</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            padding: 10px;
+        }
+        .container {
+            margin-top: 20px;
+        }
+        h2 {
+            text-align: center;
+            font-size: 1.5rem;
+        }
+        .form-group label {
+            font-size: 1rem;
+        }
+        .form-group input, .form-group select {
+            font-size: 1rem;
+            padding: 10px;
+        }
+        .btn {
+            font-size: 1.2rem;
+            width: 100%;
+            margin-bottom: 10px;
+        }
+        table {
+            margin-top: 20px;
+            font-size: 0.9rem;
+        }
+        th, td {
+            text-align: center;
+            padding: 5px;
+        }
+        .total-gain {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 20px 0;
+            color: #28a745;
+            text-align: center;
+        }
+        @media (max-width: 768px) {
+            h2 {
+                font-size: 1.25rem;
+            }
+            .form-group input, .form-group select, .btn {
+                font-size: 1rem;
+                padding: 8px;
+            }
+            table {
+                font-size: 0.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Registro de Compras y Ventas de Criptomonedas</h2>
+
+        <!-- Registro de Compra -->
+        <div class="form-group">
+            <label for="cryptoSelect">Selecciona una Criptomoneda:</label>
+            <select id="cryptoSelect" class="form-control">
+                <option value="Solana">Solana</option>
+                <option value="Bitcoin">Bitcoin</option>
+                <option value="Ethereum">Ethereum</option>
+                <option value="Ripple">Ripple</option>
+                <option value="Litecoin">Litecoin</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="buyPrice">Precio de Compra:</label>
+            <input type="number" id="buyPrice" class="form-control" placeholder="Precio de compra" required min="0.01" step="0.01">
+        </div>
+        <div class="form-group">
+            <label for="buyAmount">Cantidad:</label>
+            <input type="number" id="buyAmount" class="form-control" placeholder="Cantidad" required min="0.01" step="0.01">
+        </div>
+        <button id="buyButton" class="btn btn-primary">Registrar Compra</button>
+
+        <!-- Registro de Venta -->
+        <div class="form-group">
+            <label for="sellSelect">Selecciona una Criptomoneda para Vender:</label>
+            <select id="sellSelect" class="form-control"></select>
+        </div>
+        <div class="form-group">
+            <label for="sellPrice">Precio de Venta:</label>
+            <input type="number" id="sellPrice" class="form-control" placeholder="Precio de venta" required min="0.01" step="0.01">
+        </div>
+        <div class="form-group">
+            <label for="sellAmount">Cantidad a Vender:</label>
+            <input type="number" id="sellAmount" class="form-control" placeholder="Cantidad a vender" required min="0.01" step="0.01">
+        </div>
+        <button id="sellButton" class="btn btn-danger">Registrar Venta</button>
+
+        <!-- Total de Ganancias -->
+        <div class="total-gain" id="totalGain">Ganancias Totales: $0</div>
+
+        <!-- Historial de Compras -->
+        <h3>Historial de Compras</h3>
+        <table class="table table-bordered table-responsive-sm" id="purchaseTable">
+            <thead>
+                <tr>
+                    <th>Cripto</th>
+                    <th>Precio de Compra</th>
+                    <th>Cantidad</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody id="purchaseBody"></tbody>
+        </table>
+
+        <!-- Historial de Ventas -->
+        <h3>Historial de Ventas</h3>
+        <table class="table table-bordered table-responsive-sm" id="salesTable">
+            <thead>
+                <tr>
+                    <th>Cripto</th>
+                    <th>Precio de Venta</th>
+                    <th>Cantidad</th>
+                    <th>Ganancia</th>
+                    <th>Fecha</th>
+                </tr>
+            </thead>
+            <tbody id="salesBody"></tbody>
+        </table>
+
+        <!-- Backup y Restauración -->
+        <button id="exportButton" class="btn btn-secondary">Exportar a CSV</button>
+        <input type="file" id="restoreInput" accept=".csv" style="display:none;" />
+        <button id="backupButton" class="btn btn-info">Backup</button>
+        <button id="restoreButton" class="btn btn-warning">Restaurar</button>
+        <button id="resetButton" class="btn btn-danger">Reiniciar Base de Datos</button>
+    </div>
+
+    <script>
+        // Main application state
+        let cryptoTracker = {
+            purchases: [],
+            sales: [],
+            availableCrypto: {}
+        };
+
+        // Save data to localStorage
+        function saveToLocalStorage() {
+            localStorage.setItem('cryptoTracker', JSON.stringify(cryptoTracker));
+        }
+
+        // Load data from localStorage
+        function loadFromLocalStorage() {
+            const savedData = localStorage.getItem('cryptoTracker');
+            if (savedData) {
+                cryptoTracker = JSON.parse(savedData);
+                updateUI();
+            }
+        }
+
+        // Reset data
+        function resetData() {
+            cryptoTracker = {
+                purchases: [],
+                sales: [],
+                availableCrypto: {}
+            };
+            saveToLocalStorage();
+            updateUI();
+        }
+
+        // Update purchase history table
+        function displayPurchases() {
+            const purchaseBody = document.getElementById('purchaseBody');
+            purchaseBody.innerHTML = '';
+            cryptoTracker.purchases.forEach(purchase => {
+                const row = `
+                    <tr>
+                        <td>${purchase.crypto}</td>
+                        <td>$${purchase.buyPrice.toFixed(2)}</td>
+                        <td>${purchase.amount.toFixed(2)}</td>
+                        <td>${new Date(purchase.date).toLocaleString()}</td>
+                    </tr>
+                `;
+                purchaseBody.innerHTML += row;
+            });
+        }
+
+        // Update sales history table
+        function displaySales() {
+            const salesBody = document.getElementById('salesBody');
+            salesBody.innerHTML = '';
+            cryptoTracker.sales.forEach(sale => {
+                const row = `
+                    <tr>
+                        <td>${sale.crypto}</td>
+                        <td>$${sale.sellPrice.toFixed(2)}</td>
+                        <td>${sale.amount.toFixed(2)}</td>
+                        <td>$${sale.gain.toFixed(2)}</td>
+                        <td>${new Date(sale.date).toLocaleString()}</td>
+                    </tr>
+                `;
+                salesBody.innerHTML += row;
+            });
+        }
+
+        // Update total gains
+        function updateTotalGains() {
+            const totalGain = cryptoTracker.sales.reduce((sum, sale) => sum + sale.gain, 0);
+            document.getElementById('totalGain').textContent = `Ganancias Totales: $${totalGain.toFixed(2)}`;
+        }
+
+        // Update sell dropdown options
+        function updateSellOptions() {
+            const sellSelect = document.getElementById('sellSelect');
+            sellSelect.innerHTML = '';
+
+            // Calculate available crypto amounts
+            cryptoTracker.availableCrypto = {};
+            cryptoTracker.purchases.forEach(purchase => {
+                if (!cryptoTracker.availableCrypto[purchase.crypto]) {
+                    cryptoTracker.availableCrypto[purchase.crypto] = 0;
+                }
+                cryptoTracker.availableCrypto[purchase.crypto] += purchase.amount;
+            });
+
+            cryptoTracker.sales.forEach(sale => {
+                if (cryptoTracker.availableCrypto[sale.crypto]) {
+                    cryptoTracker.availableCrypto[sale.crypto] -= sale.amount;
+                }
+            });
+
+            // Populate sell options
+            Object.entries(cryptoTracker.availableCrypto)
+                .filter(([_, amount]) => amount > 0)
+                .forEach(([crypto, amount]) => {
+                    const option = document.createElement('option');
+                    option.value = crypto;
+                    option.textContent = `${crypto} (Disponible: ${amount.toFixed(2)})`;
+                    sellSelect.appendChild(option);
+                });
+        }
+
+        // Register purchase
+        document.getElementById('buyButton').addEventListener('click', function() {
+            const crypto = document.getElementById('cryptoSelect').value;
+            const buyPrice = parseFloat(document.getElementById('buyPrice').value);
+            const amount = parseFloat(document.getElementById('buyAmount').value);
+
+            if (buyPrice > 0 && amount > 0) {
+                const purchase = {
+                    crypto,
+                    buyPrice,
+                    amount,
+                    date: new Date().toISOString()
+                };
+
+                cryptoTracker.purchases.push(purchase);
+                saveToLocalStorage();
+                updateUI();
+
+                // Reset inputs
+                document.getElementById('buyPrice').value = '';
+                document.getElementById('buyAmount').value = '';
+            } else {
+                alert('Por favor, ingrese valores válidos.');
+            }
+        });
+
+        // Register sale
+        document.getElementById('sellButton').addEventListener('click', function() {
+            const crypto = document.getElementById('sellSelect').value;
+            const sellPrice = parseFloat(document.getElementById('sellPrice').value);
+            const amount = parseFloat(document.getElementById('sellAmount').value);
+
+            const availableAmount = cryptoTracker.availableCrypto[crypto] || 0;
+
+            if (sellPrice > 0 && amount > 0 && amount <= availableAmount) {
+                // Encontrar las compras correspondientes y calcular la ganancia
+                let remainingAmount = amount;
+                let totalPurchasePrice = 0;
+                let purchaseIndex = 0;
+
+                while (remainingAmount > 0 && purchaseIndex < cryptoTracker.purchases.length) {
+                    const purchase = cryptoTracker.purchases[purchaseIndex];
+                    if (purchase.crypto === crypto) {
+                        const usedAmount = Math.min(remainingAmount, purchase.amount);
+                        totalPurchasePrice += usedAmount * purchase.buyPrice;
+                        remainingAmount -= usedAmount;
+                    }
+                    purchaseIndex++;
+                }
+
+                const gain = (sellPrice * amount) - totalPurchasePrice;
+                const sale = {
+                    crypto,
+                    sellPrice,
+                    amount,
+                    gain,
+                    date: new Date().toISOString()
+                };
+
+                cryptoTracker.sales.push(sale);
+                saveToLocalStorage();
+                updateUI();
+
+                // Reset inputs
+                document.getElementById('sellPrice').value = '';
+                document.getElementById('sellAmount').value = '';
+            } else {
+                alert('Por favor, ingrese valores válidos o verifique la cantidad disponible.');
+            }
+        });
+
+        // Export to CSV
+        document.getElementById('exportButton').addEventListener('click', function() {
+            const csvContent = generateCSV();
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'crypto_tracker_backup.csv');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Generate CSV content
+        function generateCSV() {
+            let csvContent = 'Type,Crypto,Price,Amount,Date,Gain\n';
+            
+            cryptoTracker.purchases.forEach(p => {
+                csvContent += `Purchase,${p.crypto},${p.buyPrice},${p.amount},${p.date},\n`;
+            });
+            
+            cryptoTracker.sales.forEach(s => {
+                csvContent += `Sale,${s.crypto},${s.sellPrice},${s.amount},${s.date},${s.gain}\n`;
+            });
+            
+            return csvContent;
+        }
+
+        // Backup data
+        document.getElementById('backupButton').addEventListener('click', function() {
+            const backupData = JSON.stringify(cryptoTracker);
+            const blob = new Blob([backupData], { type: 'application/json' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', 'crypto_tracker_backup.json');
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        // Restore data
+        document.getElementById('restoreButton').addEventListener('click', function() {
+            document.getElementById('restoreInput').click();
+        });
+
+        document.getElementById('restoreInput').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const restoredData = JSON.parse(e.target.result);
+                        cryptoTracker = restoredData;
+                        saveToLocalStorage();
+                        updateUI();
+                        alert('Datos restaurados exitosamente.');
+                    } catch (error) {
+                        alert('Error al restaurar los datos. Verifique el archivo.');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Reset data
+        document.getElementById('resetButton').addEventListener('click', function() {
+            if (confirm('¿Está seguro de que desea reiniciar la base de datos?')) {
+                resetData();
+                alert('Base de datos reiniciada exitosamente.');
+            }
+        });
+
+        // Update entire UI
+        function updateUI() {
+            displayPurchases();
+            displaySales();
+            updateSellOptions();
+            updateTotalGains();
+        }
+
+        // Initialize app
+        function initializeApp() {
+            loadFromLocalStorage();
+        }
+
+        initializeApp();
+    </script>
+</body>
+</html>
